@@ -63,7 +63,7 @@ aside{padding:4px 8px}
     <p>The store itself: a black menu board, white counter, walnut slats and receipts.</p>
   </div>
   <p class="note">Design proposal. <span class="wide">Tap anything on the phone. </span>Sample data only; nothing is sent or saved.</p>
-  <nav class="switch" aria-label="Design options"><a href="option-a.html" aria-label="Option A: Swirl">A<span class="wide">: Swirl</span></a><a href="option-b.html" aria-label="Option B: Café" aria-current="page">B<span class="wide">: Café</span></a><a href="option-c.html" aria-label="Option C: Reserve">C<span class="wide">: Reserve</span></a></nav>
+  <nav class="switch" aria-label="Design options"><a href="option-a.html" aria-label="Option A: Swirl">A<span class="wide">: Swirl</span></a><a href="option-b.html" aria-label="Option B: Café" aria-current="page">B<span class="wide">: Café</span></a><a href="option-c.html" aria-label="Option C: Reserve">C<span class="wide">: Reserve</span></a><a href="option-d.html" aria-label="Option D: Craft">D<span class="wide">: Craft</span></a></nav>
   <button id="replay" type="button">Restart<span class="wide"> from the splash</span></button>
   <div id="screen-list"></div>
 </aside>
@@ -139,6 +139,7 @@ aside{padding:4px 8px}
   function renderSvg(n, parentDir) {
     const el = document.createElement('div');
     el.innerHTML = n.svg;
+    el.style.position = 'relative';
     el.style.width = px(n.w);
     el.style.height = px(n.h);
     el.style.flexShrink = '0';
@@ -295,6 +296,7 @@ aside{padding:4px 8px}
     a: { rise: { dur: 380, ease: E.out }, stagger: 1, card: { sp: spring(220, 24), dur: 620 }, pop: { sp: spring(420, 22), dur: 480 }, stamp: { sp: spring(420, 22), dur: 480 } },
     b: { rise: { dur: 320, ease: E.out }, stagger: 0.8, card: { dur: 340, ease: E.press }, pop: { dur: 260, ease: E.press }, stamp: { dur: 180, ease: E.in } },
     c: { rise: { dur: 620, ease: E.slowOut }, stagger: 1.35, card: { dur: 760, ease: E.slowOut }, pop: { sp: spring(300, 26), dur: 620 }, stamp: { sp: spring(300, 26), dur: 620 } },
+    d: { rise: { dur: 420, ease: E.out }, stagger: 1, card: { dur: 480, ease: E.out }, pop: { sp: spring(380, 26), dur: 480 }, stamp: { dur: 200, ease: E.in } },
   };
 
   function animateEntrance(rootEl, optionId) {
@@ -323,7 +325,7 @@ aside{padding:4px 8px}
       tween(el, (e, v) => { e.style.transform = `scale(${Math.max(0, v)})`; e.style.opacity = clamp(v * 3); }, { d, ...P.pop });
     },
     stamp(el, an, d, P, optionId) {
-      if (P === PERSONA.b) {
+      if (P === PERSONA.b || P === PERSONA.d) {
         // Drops from above the card and lands hard, with no overshoot.
         tween(el, (e, v) => { e.style.transform = `scale(${lerp(1.7, 1, v)})`; e.style.opacity = clamp(v * 2.5); }, { d, ...P.stamp });
         return;
@@ -357,6 +359,18 @@ aside{padding:4px 8px}
         tween(line, (l, v) => { l.style.strokeDashoffset = String(1 - clamp(v)); }, { d: d + i * 40, dur: an.dur || 1200, ease: E.slowOut });
       });
       el.style.opacity = baseOp;
+    },
+    // The hero logo is pressed on like a seal, and the surface gives a little.
+    seal(el, an, d) {
+      tween(el, (e, v) => { e.style.transform = `scale(${lerp(1.45, 1, v)})`; e.style.opacity = clamp(v * 3); }, { d, dur: 260, ease: E.in });
+      TL.at(d + 260, () => {
+        tween(el, (e, v) => { e.style.transform = `scale(${1 + 0.03 * Math.sin(Math.PI * clamp(v))})`; }, { dur: 280, ease: E.out });
+      });
+    },
+    // The brand book's light streak rises along the frame edge.
+    aura(el, an, d) {
+      el.style.clipPath = 'inset(100% 0 0 0)';
+      tween(el, (e, v) => { e.style.clipPath = `inset(${(1 - clamp(v)) * 100}% 0 0 0)`; }, { d, dur: 900, ease: E.slowOut });
     },
     // The emblem assembles: ring draws, bar crosses it, then bean and leaf land.
     emblem(el, an, d) {
@@ -570,8 +584,34 @@ aside{padding:4px 8px}
       });
     }
 
+    /** Golden Caramel pours down the screen on a moving wave, the way milk meets coffee
+     *  in the book's key visuals (p44), and the next screen appears behind it. */
+    function pour(next, old) {
+      const s = shape(theme.c.accent);
+      s.style.inset = '0';
+      const edge = (y, v, phase) => {
+        const amp = 30 * Math.sin(Math.PI * clamp(v));
+        const pts = [];
+        for (let x = SCREEN_W; x >= 0; x -= 15) pts.push(`${x}px ${(y + amp * Math.sin(x / 62 + phase + v * 5)).toFixed(1)}px`);
+        return pts.join(',');
+      };
+      const height = viewport.clientHeight;
+      hide(next);
+      tween(s, (e, v) => { e.style.clipPath = `polygon(0px 0px,${SCREEN_W}px 0px,${edge(lerp(-40, height + 40, clamp(v)), clamp(v), 0)})`; }, {
+        dur: 420, ease: E.press,
+        done: () => {
+          show(next);
+          old.el.remove();
+          enter(next);
+          tween(s, (e, v) => { e.style.clipPath = `polygon(0px ${height}px,${SCREEN_W}px ${height}px,${edge(lerp(-40, height + 40, clamp(v)), clamp(v), 2)})`; }, {
+            dur: 420, ease: E.press, done: () => { s.remove(); finishLayers(next, null); },
+          });
+        },
+      });
+    }
+
     const TX = {
-      flood(next, old, origin) { flood(next, old, origin, optionId === 'c' ? theme.c.hero : optionId === 'b' ? theme.c.ink : theme.c.primary); },
+      flood(next, old, origin) { if (optionId === 'd') { pour(next, old); return; } flood(next, old, origin, optionId === 'c' ? theme.c.hero : optionId === 'b' ? theme.c.ink : theme.c.primary); },
 
       // A black panel crosses like a roller shutter; the screen changes behind it.
       shutter(next, old) {
@@ -648,6 +688,8 @@ aside{padding:4px 8px}
           return;
         }
         if (optionId === 'b') { flood(next, old, origin, theme.c.wood); return; }
+        // Craft's button is caramel, so one shape grows out of it and becomes the transition.
+        if (optionId === 'd') { flood(next, old, origin, theme.c.accent); return; }
         // Swirl: a circle opens out of the button, purple at its rim, the page inside.
         zOf(next, 2);
         const cx = from.x + from.w / 2;
@@ -709,7 +751,7 @@ aside{padding:4px 8px}
             ghost.style.left = `${leftEdge}px`;
             ghost.style.width = `${rightEdge - leftEdge}px`;
           } else {
-            const e = (optionId === 'b' ? E.press : E.slowOut)(clamp(t / (optionId === 'b' ? 240 : 320)));
+            const e = (optionId === 'b' || optionId === 'd' ? E.press : E.slowOut)(clamp(t / (optionId === 'b' || optionId === 'd' ? 240 : 320)));
             ghost.style.left = `${left - step * (1 - e)}px`;
             ghost.style.width = `${w}px`;
           }
